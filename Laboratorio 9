@@ -1,0 +1,119 @@
+/*
+Alex Daniel Maas Esquivel
+#17146
+Laboratorio 9
+ */
+
+//Librerias usadas
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/tm4c123gh6pm.h"
+#include "inc/hw_memmap.h"
+#include "inc/hw_types.h"
+#include "inc/hw_ints.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/interrupt.h"
+#include "driverlib/gpio.h"
+#include "driverlib/timer.h"
+#include "driverlib/uart.h"
+#include "driverlib/systick.h"
+
+#define XTAL 16000000
+
+//Variables usadas
+unsigned char VAR;
+uint8_t Azul;
+uint8_t Rojo;
+uint8_t Verde;
+uint8_t indicador;
+
+void TMR0_CONFIG (void);
+void UART_CONFIG (void);
+
+int main(void)
+{
+    //PARTE 2, CONFIGURAR RELOJ A 40 MHz
+    SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_OSC | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+    //HABILITAR EL PUERTO F
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    //LEDS COMO SALIDAS
+    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3);
+    TMR0_CONFIG();
+    UART_CONFIG();
+    while (1)
+    {
+
+    }
+}
+//CONFIGURACION DEL TIMER0
+void TMR0_CONFIG (void){
+    uint32_t ui32Period;
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+    TimerConfigure(TIMER0_BASE, TIMER_CFG_PERIODIC);
+    ui32Period = (SysCtlClockGet()) / 2;
+    TimerLoadSet(TIMER0_BASE, TIMER_A, ui32Period - 1);
+    IntEnable(INT_TIMER0A);
+    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    IntMasterEnable();
+    TimerEnable(TIMER0_BASE, TIMER_A);
+}
+//CONFIGURACION UART
+void UART_CONFIG(void){
+    //Enable the GPIO Port A
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+    //Enable the peripheral UART Module 0/
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+    // Make the UART pins be peripheral controlled.
+    GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+    // Sets the configuration of a UART.
+    UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 115200,
+                        (UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE));
+    UARTIntEnable(UART0_BASE, UART_INT_RX | UART_INT_RT);
+    IntEnable(INT_UART0);
+    UARTEnable(UART0_BASE);
+//VERIFICACION DE FUNCIONAMIENTO
+    UARTCharPut(UART0_BASE,'F');
+    UARTCharPut(UART0_BASE,'U');
+    UARTCharPut(UART0_BASE,'N');
+    UARTCharPut(UART0_BASE,'C');
+    UARTCharPut(UART0_BASE,'I');
+    UARTCharPut(UART0_BASE,'O');
+    UARTCharPut(UART0_BASE,'N');
+    UARTCharPut(UART0_BASE,'A');
+    UARTCharPut(UART0_BASE,' ');
+}
+
+void Timer0IntHandler(void){
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);     //Limpiamos la bandera
+    if (indicador==1){
+        GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1 | GPIO_PIN_2 | GPIO_PIN_3, 0);
+        indicador = 0;
+    }else{
+        indicador = 1;
+        if(Rojo){
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, GPIO_PIN_1);
+        }else{
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_1, 0);
+        }if (Azul){
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, GPIO_PIN_2);
+        }else{
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_2, 0);
+        }if (Verde){
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, GPIO_PIN_3);
+        }else{
+            GPIOPinWrite(GPIO_PORTF_BASE, GPIO_PIN_3, 0);
+        }
+    }
+}
+
+void UARTIntHandler(void){
+    UARTIntClear(UART0_BASE,UART_INT_RX | UART_INT_RT);     //Limpiar bandera
+    VAR = UARTCharGet(UART0_BASE);                          //Guardamos en el puerto serial
+    if (VAR == 'r'){                                        //Verificamos el valor
+        Rojo=~Rojo;                                         //Hacemos cambio de valor
+    }else if (VAR == 'b'){                                  //Verificamos el valor
+        Azul=~Azul;                                         //Hacemos cambio de valor
+    }else if (VAR =='g'){                                   //Verificamos el valor
+        Verde=~Verde;                                       //Hacemos cambio de valor
+    }
+}
